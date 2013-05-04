@@ -1,3 +1,13 @@
+window.requestAnimFrame = (function(){
+  return  window.requestAnimationFrame       ||
+          window.webkitRequestAnimationFrame ||
+          window.mozRequestAnimationFrame    ||
+          function( callback ){
+            window.setTimeout(callback, 1000 / 60);
+          };
+})();
+
+
 function CirclesGame (width, height) {
     this.width = width;
     this.height = height;
@@ -21,7 +31,33 @@ function CirclesGame (width, height) {
     }
 
     this.DrawScene = function (shift_x, shift_y) {
+        this.output.globalAlpha = 0.75;
         this.output.drawImage(this.canvas,shift_x,shift_y);
+        
+        /*var imgd = this.buffer.getImageData(0, 0, 640, 480);
+        var data = imgd.data;
+
+        for (var i = 0, n = data.length; i < n; i += 4) {
+
+            // generating random color coefficients
+            var randColor1 = 0.6 + Math.random() * 0.4;
+            var randColor2 = 0.6 + Math.random() * 0.4;
+            var randColor3 = 0.6 + Math.random() * 0.4;
+
+            // assigning random colors to our data
+            data[i] = data[i]*randColor1; // green
+            data[i+1] = data[i+1]*randColor2; // green
+            data[i+2] = data[i+2]*randColor3; // blue
+        }
+        var newcont = document.createElement("canvas");
+        newcont.width = 640;
+        newcont.height = 480;
+        var abba = newcont.getContext("2d");
+        abba.putImageData(imgd, 0, 0);
+
+        this.output.drawImage(newcont,0,0);*/
+        
+
     }
 
     this.ClearBuffer = function () {
@@ -46,13 +82,13 @@ function mouse(obj, evt) {
     };
 }
 
-    var keyboard = {};
-    addEventListener("keydown", function (e) {
-        keyboard[e.keyCode] = true;
-    }, false);
-    addEventListener("keyup", function (e) {
-        delete keyboard[e.keyCode];
-    }, false);
+var keyboard = {};
+addEventListener("keydown", function (e) {
+    keyboard[e.keyCode] = true;
+}, false);
+addEventListener("keyup", function (e) {
+    delete keyboard[e.keyCode];
+}, false);
 //************************
 
 var game = new CirclesGame(640,480);
@@ -63,7 +99,7 @@ game.SetScene("circles");
 game.buffer.shadowBlur = 20; 
 game.buffer.shadowColor = "rgba(255,255,255,0.4)";
 game.buffer.webkitImageSmoothingEnabled = true;
-game.fps = 30;
+game.fps = 60;
 
 const TYPE_NOTE = 1;
 const TYPE_EMIT = 2;
@@ -87,8 +123,7 @@ var cursor = {
 
 const colors = randomColors(64);
 
-function randomColors(total)
-{
+function randomColors(total) {
     var i = 360 / (total - 1); // distribute the colors evenly on the hue range
     var r = []; // hold the generated colors
     for (var x=0; x<total; x++)
@@ -197,7 +232,7 @@ const Levels = {
         nextLevel:        3,
         goal:             6,
         wavesLeft:        2,
-        emittersLeft:     0,
+        emittersLeft:     2,
         cursorSize:       4,
         gameElements: {
             circle: [],
@@ -251,6 +286,7 @@ const Settings = {
 Settings.LoadLevel(Levels[0]);
 
 game.Logic = function () {
+    requestAnimFrame(game.Logic);
     //MOUSE############################################
         game.ocanvas.onmousemove = function (e) {
             var mousevn = mouse(this, e);
@@ -271,7 +307,7 @@ game.Logic = function () {
                     case CURR_EMIT:
                         if(Settings.emittersLeft>0) {
                             Settings.emittersLeft--;
-                            
+                            Settings.gameElements.block.push(new Block(mousevn.x, mousevn.y, 0, TYPE_EMIT, {blocked: false, cycle: 1, wave: 1, once: true}));
                         }
                         break;
                 }
@@ -327,6 +363,7 @@ game.Logic = function () {
                                     Settings.gameElements.block[n].settings.audio.currentTime = 0;
                                     Settings.gameElements.block[n].settings.audio.play();
                                     Settings.gameElements.block[n].settings.isplay = true;
+                                    $('body').stop().animate({backgroundColor: Settings.gameElements.block[n].settings.color},500);
                                     if(Settings.gameElements.block[n].settings.once) Settings.gameElements.block[n].settings.blocked = true;
                                     if(Settings.gameElements.block[n].settings.goalable) Settings.goal--;
                                 }
@@ -370,7 +407,10 @@ game.Logic = function () {
             switch (Settings.gameElements.block[n].type) {
                 case TYPE_NOTE:
                     if(Settings.gameElements.block[n].settings.blocked) game.buffer.fillStyle = "#999999";
-                    else game.buffer.fillStyle = colors[Settings.gameElements.block[n].x%colors.length];
+                    else {
+                        game.buffer.fillStyle = colors[Settings.gameElements.block[n].x%colors.length];
+                        Settings.gameElements.block[n].settings.color = game.buffer.fillStyle;  
+                    } 
                     if (Settings.gameElements.block[n].settings.isplay) {
                         game.buffer.fillRect(Settings.gameElements.block[n].x-2,Settings.gameElements.block[n].y-2,4,4);
                         Settings.gameElements.block[n].settings.isplay = false;
@@ -413,7 +453,7 @@ game.Logic = function () {
                             game.buffer.fillStyle="#888888";
                             game.buffer.strokeStyle = '#888888';
                             game.buffer.lineWidth = 1;
-                            game.buffer.arc(Settings.gameElements.block[n].x, Settings.gameElements.block[n].y, 4, 0, 2 * Math.PI, false);
+                            game.buffer.rect(Settings.gameElements.block[n].x-2, Settings.gameElements.block[n].y-2, 4, 4);
                             game.buffer.stroke();
                             game.buffer.fill();
                         } else {
@@ -421,7 +461,7 @@ game.Logic = function () {
                             game.buffer.fillStyle="white";
                             game.buffer.strokeStyle = 'white';
                             game.buffer.lineWidth = 1;
-                            game.buffer.arc(Settings.gameElements.block[n].x, Settings.gameElements.block[n].y, 5, 0, 2 * Math.PI, false);
+                            game.buffer.rect(Settings.gameElements.block[n].x-3, Settings.gameElements.block[n].y-3, 6, 6);
                             game.buffer.stroke();
                             game.buffer.fill();
                         }
@@ -444,7 +484,6 @@ game.Logic = function () {
 
 
         game.buffer.save();
-        var csize = 5;
         if (90 in keyboard) {
                 game.buffer.save();
                 game.buffer.beginPath();
@@ -456,28 +495,35 @@ game.Logic = function () {
         }
 
         var quan = 1;
+        game.buffer.fillStyle = "white";
 
-        if(cursor.current==CURR_WAVE) quan = Settings.wavesLeft/Levels[Settings.levelNumber].wavesLeft;
-        else if (cursor.current==CURR_EMIT) quan = Settings.emittersLeft;
-        console.log(quan);
-        if(cursor.pressed) {
-            game.buffer.lineWidth = 1;
-        } else {
+
+        if(cursor.current==CURR_WAVE) {
             game.buffer.lineWidth = 2;
-        }
-
-            game.buffer.fillStyle = "white";
+            quan = Settings.wavesLeft/Levels[Settings.levelNumber].wavesLeft;
             game.buffer.beginPath();
             game.buffer.strokeStyle=game.buffer.fillStyle;
-            game.buffer.arc(cursor.x,cursor.y,csize,0,2*Math.PI*quan);
+            game.buffer.arc(cursor.x,cursor.y,5,0,2*Math.PI*quan);
             game.buffer.stroke();
             game.buffer.beginPath();
             game.buffer.strokeStyle=game.buffer.fillStyle;
-            game.buffer.lineWidth = 1;
+            if(cursor.pressed) {
+                game.buffer.lineWidth = 2;
+            } else {
+                game.buffer.lineWidth = 1;
+            }
             game.buffer.arc(cursor.x,cursor.y,1,0,2*Math.PI);
             game.buffer.fill();
             game.buffer.stroke();
-
+        } 
+        else if (cursor.current==CURR_EMIT) {
+            quan = Settings.emittersLeft/Levels[Settings.levelNumber].emittersLeft;
+            game.buffer.beginPath();
+            game.buffer.strokeStyle=game.buffer.fillStyle;
+            game.buffer.rect(cursor.x-4,cursor.y-4,8,8);
+            game.buffer.stroke();
+            game.buffer.fillRect(cursor.x-4,cursor.y-4,8*quan,8);
+        }
 
         game.buffer.textBaseline = "top";
         game.buffer.textAlign = "center";
@@ -530,4 +576,4 @@ game.Logic = function () {
 }
 
 //Settings.LoadLevel(0);
-game.loop = setInterval(game.Logic, 1000 / game.fps);
+game.Logic();
