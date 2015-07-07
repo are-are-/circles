@@ -62,8 +62,9 @@ function GameController(game, opts) {
         
           if (this.alpha > 0) this.collidingWith(game, NoteElement, function(note) {
           
-            var pts = note.hit(this.alpha, this, game);
-            if (pts !== false) self.score += pts;
+            note.hit(this.alpha, this, game, function(score) {
+               self.score += score;
+            });
           });
         });
 
@@ -133,18 +134,19 @@ var lvl_1     = new GameLevel({ score: 5, waves: 5, power: 50, next: '2', elemen
                   NoteElement, { x: 480, y: 240, hits: 1, score: 1, resources: [ 'note5' ], brightness: 50, hue: 60, saturation: 100 }
                 ] });
 
-var lvl_2     = new GameLevel({ score: 8, waves: 1, power: 50, speed: 100, next: '3', elements: [
+var lvl_2     = new GameLevel({ score: 8, waves: 8, power: 50, speed: 100, next: '3', elements: [
                   BlockerElement, { x: 120, y: 200, width: 360, height: 80, alpha: 0.7, brightness: 10, hue: 0, saturation: 50, path: function(path, mode) {
                     mode.rectOut(path);
                   } },
-                  NoteEmitElement, { x: 160, y: 240, hits: 1, score: 1, resources: [ 'note1' ], brightness: 50, hue: 0, saturation: 100 },
-                  NoteEmitElement, { x: 200, y: 240, hits: 1, score: 1, resources: [ 'note5' ], brightness: 50, hue: 60, saturation: 100 },
-                  NoteEmitElement, { x: 240, y: 240, hits: 1, score: 1, resources: [ 'note4' ], brightness: 50, hue: 45, saturation: 100 },
-                  NoteEmitElement, { x: 280, y: 240, hits: 1, score: 1, resources: [ 'note3' ], brightness: 50, hue: 30, saturation: 100 },
-                  NoteEmitElement, { x: 320, y: 240, hits: 1, score: 1, resources: [ 'note5' ], brightness: 50, hue: 60, saturation: 100 },
-                  NoteEmitElement, { x: 360, y: 240, hits: 1, score: 1, resources: [ 'note4' ], brightness: 50, hue: 45, saturation: 100 },
-                  NoteEmitElement, { x: 400, y: 240, hits: 1, score: 1, resources: [ 'note1' ], brightness: 50, hue: 0, saturation: 100 },
-                  NoteEmitElement, { x: 440, y: 240, hits: 1, score: 1, resources: [ 'note2' ], brightness: 50, hue: 15, saturation: 100 },
+                  TextElement, { x: 120, y: 300, text: 'No new waves allowed on the red field!', font: 'Minimal', fontSize: 16, brightness: 100 },
+                  NoteElement, { x: 160, y: 240, hits: 1, score: 1, resources: [ 'note1' ], brightness: 50, hue: 0, saturation: 100 },
+                  NoteElement, { x: 200, y: 240, hits: 1, score: 1, resources: [ 'note5' ], brightness: 50, hue: 60, saturation: 100 },
+                  NoteElement, { x: 240, y: 240, hits: 1, score: 1, resources: [ 'note4' ], brightness: 50, hue: 45, saturation: 100 },
+                  NoteElement, { x: 280, y: 240, hits: 1, score: 1, resources: [ 'note3' ], brightness: 50, hue: 30, saturation: 100 },
+                  NoteElement, { x: 320, y: 240, hits: 1, score: 1, resources: [ 'note5' ], brightness: 50, hue: 60, saturation: 100 },
+                  NoteElement, { x: 360, y: 240, hits: 1, score: 1, resources: [ 'note4' ], brightness: 50, hue: 45, saturation: 100 },
+                  NoteElement, { x: 400, y: 240, hits: 1, score: 1, resources: [ 'note1' ], brightness: 50, hue: 0, saturation: 100 },
+                  NoteElement, { x: 440, y: 240, hits: 1, score: 1, resources: [ 'note2' ], brightness: 50, hue: 15, saturation: 100 },
                   
                 ] });
                 
@@ -152,6 +154,7 @@ var lvl_3     = new GameLevel({ score: 4, waves: 4, power: 50, speed: 100, next:
                   BlockerElement, { x: 300, y: 220, radius: 20, fill: 'nonzero', alpha: 0.7, brightness: 10, hue: 0, saturation: 50, path: function(path, mode) {
                     mode.circleOut(path);
                   }, update: function(time, game) {
+                    
                     var dx = game.controllers.mouse.x - this.x,
                         dy = game.controllers.mouse.y - this.y,
                         dist = Math.sqrt(dx*dx + dy*dy);

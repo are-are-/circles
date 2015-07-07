@@ -207,12 +207,20 @@ function EmptyElement(opts) {
   this._draw = [];
     
   this.on = function(action, cb) {
-    if (action === "update") this._update.push(cb);
-    else if (action === "draw") this._draw.push(cb);
+    if (action in this && ('_'+action) in this) this['_'+action].push(cb);
   };
   
-  if (options.update) this.on('update', options.update);
-  if (options.draw) this.on('draw', options.draw);
+
+  this.register = function(evt) {
+    this['_'+evt] = [];
+    this[evt] = function() {
+      for (var index = 0; index < this['_'+evt].length; index++) {
+        var callback = this['_'+evt][index];
+        var result = callback.apply(self, Array.prototype.slice.call(arguments));
+        if (result === STOP) break;
+      }
+    };
+  };
   
   this.update = function(time, game) {
     for (var index = 0; index < this._update.length; index++) {
@@ -229,6 +237,10 @@ function EmptyElement(opts) {
       if (result === STOP) break;
     }
   };
+  
+  if (options.update) this.on('update', options.update);
+  if (options.draw) this.on('draw', options.draw);
+  
   
   this.provide = function(resources) {
     if (this._resources) {
@@ -343,22 +355,26 @@ function NoteElement(opts) {
   this.force = false;
   this.disabled = false;
   
-  this.reset = function() {
-    
-  };
+  this.register('hit');
+  this.register('hitSuccess');
   
-  this.hit = function(force) {
+  this.on('hit', function(force, wave, game, cb) {
     if (this.hits > 0 && this.force === false) {
-      this.hits--;
-      this.resources[this.resourceName].volume = force;
-      this.resources[this.resourceName].currentTime = 0;
-      this.resources[this.resourceName].play();
-      this.force = force;
+      this.hitSuccess(force, wave, game, cb);
       return this.score;
     } else {
       return false;
     }
-  };
+  });
+  
+  this.on('hitSuccess', function(force, wave, game, cb) {
+    this.hits--;
+    this.resources[this.resourceName].volume = force;
+    this.resources[this.resourceName].currentTime = 0;
+    this.resources[this.resourceName].play();
+    this.force = force;
+    cb(this.score);
+  });
   
   this.on('update', function(time, game) { 
     if (this.force) this.force -= this.force/3;
@@ -381,29 +397,16 @@ function NoteEmitElement(opts) {
       self = this;
   NoteElement.call(this, opts);
   
-  this.hit = function(force, wave, game) {
-    if (this.hits > 0 && this.force === false) {
-      this.hits--;
-      this.resources[this.resourceName].volume = force;
-      this.resources[this.resourceName].currentTime = 0;
-      this.resources[this.resourceName].play();
-      this.force = force;
-      var waven = new WaveElement({ brightness: 100, x: self.x+self.width/2, y: self.y+self.height/2, force: wave.force, speed: wave.speed });
-      waven.on('update', function(time, game) {
-        
-          if (this.alpha > 0) this.collidingWith(game, NoteElement, function(note) {
-          
-            var pts = note.hit(this.alpha, this, game);
-            if (pts !== false) game.controllers.game.score += pts;
-          });
+  this.on('hitSuccess', function(force) {
+    var waven = new WaveElement({ brightness: 100, x: self.x+self.width/2, y: self.y+self.height/2, force: wave.force, speed: wave.speed });
+    waven.on('update', function(time, game) {  
+        if (this.alpha > 0) this.collidingWith(game, NoteElement, function(note) {
+          var pts = note.hit(this.alpha, this, game);
+          if (pts !== false) game.controllers.game.score += pts;
         });
-      game.add(waven);
-      
-      return this.score;
-    } else {
-      return false;
-    }
-  };
+      });
+    game.add(waven);
+  });
 }
 
 NoteEmitElement.prototype = NoteElement.prototype;
