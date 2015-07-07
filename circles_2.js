@@ -217,7 +217,7 @@ function EmptyElement(opts) {
   this.update = function(time, game) {
     for (var index = 0; index < this._update.length; index++) {
       var callback = this._update[index];
-      var result = callback.call(this, time, game);
+      var result = callback.call(self, time, game);
       if (result === STOP) break;
     }
   };
@@ -225,7 +225,7 @@ function EmptyElement(opts) {
   this.draw = function(ctx, game) {
     for (var index = 0; index < this._draw.length; index++) {
       var callback = this._draw[index];
-      var result = callback.call(this, ctx, game);
+      var result = callback.call(self, ctx, game);
       if (result === STOP) break;
     }
   };
@@ -475,7 +475,8 @@ function BlockerElement(opts) {
   EmptyElement.call(this, opts);
   ColorExtension.call(this, opts);
   
-  this.radius = opts.radius || 0;
+  this.radius = options.radius || 0;
+  this.fill = options.fill || 'evenodd';
   
   this.path = new Path2D();
   
@@ -491,10 +492,18 @@ function BlockerElement(opts) {
       path.lineTo(0, game.height);
       path.closePath();  
      },
-    circularOut: function(path) {
-      path.moveTo(this.x, this.y);
-      path.rect(this.x, this.y, this.width, this.height);
-      path.closePath();
+    circleOut: function(path) {
+      path.moveTo(self.x, self.y);
+      path.lineTo(self.x+self.radius, self.y);
+      path.arc(self.x, self.y, self.radius, 0, Math.PI*2-0.001);
+      path.closePath();     
+    },
+    rectOut: function(path) {
+      path.moveTo(self.x, self.y);
+      path.lineTo(self.x+self.width, self.y);
+      path.lineTo(self.x+self.width, self.y+self.height);
+      path.lineTo(self.x, self.y+self.height);
+      path.closePath();                
     }
   }
   
@@ -506,7 +515,7 @@ function BlockerElement(opts) {
     ctx.save();
     
     ctx.fillStyle = this.getColor();
-    ctx.fill(this.path, 'evenodd');
+    ctx.fill(this.path, this.fill);
     
     ctx.restore();
   });
@@ -524,107 +533,3 @@ function GameLevel(opts) {
   this.nextLvl = options.next || '';
 }
 
-function GameController(game, opts) {
-  var options = opts || {},
-      self = this;
-  EmptyElement.call(this, opts);
-  
-  this.current = null;
-  this.levels = {};
-  this.add = function(name, lvl) {
-    if (lvl instanceof GameLevel) {
-      this.levels[name] = lvl;    
-    }
-  };
-  
-  this.score = 0;
-  this.waves = 0;
-  
-  game.controllers.game = this;
-  
-  this.load = function(lvl, game, res) {
-     if (lvl in this.levels) {
-       this.reset(game);
-       this.current = this.levels[lvl];
-       this.waves = this.current.waves;
-       
-       for (var index = 0; index < this.current.elements.length; index += 2) {
-         var cls = this.current.elements[index],
-             args = this.current.elements[index + 1];
-             
-         game.add(new cls(args));         
-       }
-       
-       game.provide(res);
-     }
-  };
-  
-  this.reset = function(game) {
-    this.score = 0;
-    this.waves = 0;
-    game.elements.filter(function(element) {
-      return [ WaveElement, NoteElement, TextElement, BlockerElement ].some(function(cls) {
-        return element instanceof cls;
-      });
-    }).forEach(function(element) {
-      game.remove(element);
-    });
-  };
-  
-  this.wasPressed = false;
-  
-  this.on('update', function(time, game) {
-    var mouse = game.controllers.mouse;
-    if (!this.wasPressed && mouse.pressed && this.waves > 0) {
-      var isfree = game.get(BlockerElement).some(function(el) {
-        return game.buffer.isPointInPath(el.path, mouse.x, mouse.y, 'evenodd');
-      });
-      
-      if (!isfree) {
-        var wave = new WaveElement({ brightness: 100, x: mouse.x, y: mouse.y, force: self.current.wavesPower, speed: self.current.wavesSpeed });
-        wave.on('update', function(time, game) {
-        
-          if (this.alpha > 0) this.collidingWith(game, NoteElement, function(note) {
-          
-            var pts = note.hit(this.alpha, this, game);
-            if (pts !== false) self.score += pts;
-          });
-        });
-
-
-        game.add(wave);
-        this.waves--;
-      
-        this.wasPressed = true;
-      }
-    } else if (this.wasPressed && !game.controllers.mouse.pressed) {
-      this.wasPressed = false;
-    }
-    
-    
-    if (this.current !== null) {
-      if (this.score >= this.current.score)
-        self.load.call(self, self.current.nextLvl, game, game.resources);
-      
-    }
-  });
-  
-  this.on('draw', function(ctx, game) {
-    var mouse = game.controllers.mouse;
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = '#ffffff';
-    ctx.beginPath();
-    var wavesLeft = (Math.PI * 2);
-    if (self.current) wavesLeft *= (self.waves / self.current.waves);
-    
-    ctx.lineWidth = 2;
-    ctx.arc(mouse.x, mouse.y, 5, 0, wavesLeft);
-    ctx.moveTo(mouse.x, mouse.y);
-    ctx.stroke();
-    
-    ctx.beginPath();
-    ctx.lineWidth = 1;
-    ctx.arc(mouse.x, mouse.y, 1, 0, Math.PI*2);
-    ctx.stroke();
-  });
-}
