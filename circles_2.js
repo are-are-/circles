@@ -376,6 +376,38 @@ function NoteElement(opts) {
   });
 }
 
+function NoteEmitElement(opts) {
+    var options = opts || {},
+      self = this;
+  NoteElement.call(this, opts);
+  
+  this.hit = function(force, wave, game) {
+    if (this.hits > 0 && this.force === false) {
+      this.hits--;
+      this.resources[this.resourceName].volume = force;
+      this.resources[this.resourceName].currentTime = 0;
+      this.resources[this.resourceName].play();
+      this.force = force;
+      var waven = new WaveElement({ brightness: 100, x: self.x+self.width/2, y: self.y+self.height/2, force: wave.force, speed: wave.speed });
+      waven.on('update', function(time, game) {
+        
+          if (this.alpha > 0) this.collidingWith(game, NoteElement, function(note) {
+          
+            var pts = note.hit(this.alpha, this, game);
+            if (pts !== false) game.controllers.game.score += pts;
+          });
+        });
+      game.add(waven);
+      
+      return this.score;
+    } else {
+      return false;
+    }
+  };
+}
+
+NoteEmitElement.prototype = NoteElement.prototype;
+
 function WaveElement(opts) {
   var options = opts || {},
       self = this;
@@ -446,16 +478,30 @@ function BlockerElement(opts) {
   this.radius = opts.radius || 0;
   
   this.path = new Path2D();
-  this.path.moveTo(0, 0);
-  this.path.lineTo(game.width, 0);
-  this.path.lineTo(game.width, this.y);
-  this.path.lineTo(this.x + this.radius, this.y);
-  this.path.arc(this.x, this.y, this.radius, 0, Math.PI*2);
-  this.path.lineTo(game.width, this.y);
-  this.path.lineTo(game.width, game.height);
-  this.path.lineTo(0, game.height);
-  this.path.closePath();
   
+  this.paths = {
+    circularIn: function(path) { 
+      path.moveTo(0, 0);
+      path.lineTo(game.width, 0);
+      path.lineTo(game.width, this.y);
+      path.lineTo(this.x + this.radius, this.y);
+      path.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+      path.lineTo(game.width, this.y);
+      path.lineTo(game.width, game.height);
+      path.lineTo(0, game.height);
+      path.closePath();  
+     },
+    circularOut: function(path) {
+      path.moveTo(this.x, this.y);
+      path.rect(this.x, this.y, this.width, this.height);
+      path.closePath();
+    }
+  }
+  
+  if (options.path) options.path(this.path, this.paths);
+  
+  
+
   this.on('draw', function(ctx, game) {
     ctx.save();
     
@@ -478,7 +524,7 @@ function GameLevel(opts) {
   this.nextLvl = options.next || '';
 }
 
-function GameController(opts) {
+function GameController(game, opts) {
   var options = opts || {},
       self = this;
   EmptyElement.call(this, opts);
@@ -493,6 +539,8 @@ function GameController(opts) {
   
   this.score = 0;
   this.waves = 0;
+  
+  game.controllers.game = this;
   
   this.load = function(lvl, game, res) {
      if (lvl in this.levels) {
@@ -538,7 +586,7 @@ function GameController(opts) {
         
           if (this.alpha > 0) this.collidingWith(game, NoteElement, function(note) {
           
-            var pts = note.hit(this.alpha);
+            var pts = note.hit(this.alpha, this, game);
             if (pts !== false) self.score += pts;
           });
         });
