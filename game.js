@@ -12,26 +12,35 @@ function GameController(game, opts) {
     }
   };
   
+  this.create = function(name, opts) {
+    this.levels[name] = new GameLevel(opts);
+  }
+  
   this.score = 0;
   this.waves = 0;
   
   game.controllers.game = this;
   
-  this.load = function(lvl, game, res) {
+  this.load = function(lvl, game, res, cb) {
      if (lvl in this.levels) {
        this.reset(game);
        this.current = this.levels[lvl];
        this.currentName = lvl;
        this.waves = this.current.waves;
        
-       for (var index = 0; index < this.current.elements.length; index += 2) {
-         var cls = this.current.elements[index],
-             args = this.current.elements[index + 1];
-             
-         game.add(new cls(args));         
+       if (this.current._descriptor) {
+         this.current._reload();
+         game.elements.push.apply(game.elements, this.current.elements);
+       } else {
+         for (var index = 0; index < this.current.elements.length; index += 2) {
+           var cls = this.current.elements[index],
+           args = this.current.elements[index + 1];  
+           game.add(new cls(args));         
+         }
        }
        
        game.provide(res);
+       if (cb) cb(game.elements);
      }
   };
   
@@ -48,6 +57,19 @@ function GameController(game, opts) {
   };
   
   this.wasPressed = false;
+  
+  this.emitWave = function(opts, game) {
+    var waven = new WaveElement(opts);
+    waven.on('update', function(time, game) {  
+        if (this.alpha > 0) this.collidingWith(game, NoteElement, function(note) {
+          note.hit(this.alpha, this, game, function(score) {
+            self.score += score;
+          });
+          
+        });
+      });
+    game.add(waven);
+  }
   
   this.on('update', function(time, game) {
     var mouse = game.controllers.mouse;
@@ -150,11 +172,10 @@ var lvl_2     = new GameLevel({ score: 8, waves: 8, power: 50, speed: 100, next:
                   
                 ] });
                 
-var lvl_3     = new GameLevel({ score: 4, waves: 4, power: 50, speed: 100, next: 'start', elements: [
+var lvl_3     = new GameLevel({ score: 4, waves: 4, power: 50, speed: 100, next: '4', elements: [
                   BlockerElement, { x: 300, y: 220, radius: 20, fill: 'nonzero', alpha: 0.7, brightness: 10, hue: 0, saturation: 50, path: function(path, mode) {
                     mode.circleOut(path);
                   }, update: function(time, game) {
-                    
                     var dx = game.controllers.mouse.x - this.x,
                         dy = game.controllers.mouse.y - this.y,
                         dist = Math.sqrt(dx*dx + dy*dy);
@@ -190,12 +211,41 @@ gameController.add('start', lvl_start);
 gameController.add('1', lvl_1);
 gameController.add('2', lvl_2);
 gameController.add('3', lvl_3);
+gameController.create('4', { score: 4, waves: 2, power: 80, speed: 40, next: '5', elements: [
+  NoteElement, { disabled: true, id: 'n1', x: 100, y: 100, hits: 1, score: 1, resources: ['note1'], brightness: 50, hue: 0, saturation: 100 },
+  NoteTransElement, { id: 'n2', target: 'n1', x: 400, y: 100, hits: 1, score: 1, resources: ['note1'], brightness: 50, hue: 0, saturation: 100 },
+  NoteTransElement, { disabled: true, id: 'n3', target: 'n3',  x: 100, y: 170, hits: 1, score: 1, resources: ['note1'], brightness: 50, hue: 0, saturation: 100 },
+  NoteElement, { x: 400, y: 170, hits: 1, score: 1, resources: ['note1'], brightness: 50, hue: 0, saturation: 100 },
+  NoteEventElement, { x: 400, y: 400, hits: -1, score: 0, resources: ['hihat1'], brightness: 50, hue: 320, saturation: 100, event: function(force, wave, game) {
+    var self = this;
+    game.get(NoteElement).forEach(function(note) {
+      if (note !== self) {
+        if (note.disabled) note.disabled = false;
+        else note.disabled = true;
+        note.force = 0.1;
+      }
+    });
+  }, descriptor: function() {
+    this.on('draw', function(ctx, game) {
+    
+      ctx.strokeStyle = this.getColor();
+      ctx.beginPath();
+      ctx.moveTo(this.x - 4, this.y - 4);
+      ctx.lineTo(this.x + this.width + 4, this.y - 4);
+      ctx.lineTo(this.x + this.width + 4, this.y +this.height+ 4);
+      ctx.lineTo(this.x- 4, this.y +this.height+ 4);
+      ctx.closePath();
 
-game.load({ note1: './wav/5.wav', note2: './wav/4.wav', note3: './wav/3.wav', note4: './wav/2.wav', note5: './wav/1.wav' }, function(res) {  
+      ctx.stroke();
+    });
+  }}
+] });
+
+game.load({ hihat1: './wav/s1.wav', note1: './wav/5.wav', note2: './wav/4.wav', note3: './wav/3.wav', note4: './wav/2.wav', note5: './wav/1.wav' }, function(res) {  
   
   
   game.start();
   
-  gameController.load('2', game, res);
+  gameController.load('start', game, res);
 });
 

@@ -241,6 +241,8 @@ function EmptyElement(opts) {
   if (options.update) this.on('update', options.update);
   if (options.draw) this.on('draw', options.draw);
   
+  if (options.descriptor) options.descriptor.call(this);
+  
   
   this.provide = function(resources) {
     if (this._resources) {
@@ -345,21 +347,23 @@ function NoteElement(opts) {
   ColorExtension.call(this, opts);
   ResourceExtension.call(this, opts);
   
-  this.width = this.height = opts.size || 5;
+  this.width = this.height = options.size || 5;
   this.resourceName = this._resources[0] || '';
   
-  this.score = opts.score || 0;
-  this._hits = opts.hits || 0;
-  this.hits  = opts.hits || 0;
+  this.score = options.score || 0;
+  this._hits = options.hits || 0;
+  this.hits  = options.hits || 0;
+  
+  this.id = options.id || '';
   
   this.force = false;
-  this.disabled = false;
+  this.disabled = options.disabled || false;
   
   this.register('hit');
   this.register('hitSuccess');
   
   this.on('hit', function(force, wave, game, cb) {
-    if (this.hits > 0 && this.force === false) {
+    if ((this.hits > 0 || this.hits === -1) && this.force === false && this.disabled === false) {
       this.hitSuccess(force, wave, game, cb);
       return this.score;
     } else {
@@ -368,7 +372,7 @@ function NoteElement(opts) {
   });
   
   this.on('hitSuccess', function(force, wave, game, cb) {
-    this.hits--;
+    if (this.hits > 0) this.hits--;
     this.resources[this.resourceName].volume = force;
     this.resources[this.resourceName].currentTime = 0;
     this.resources[this.resourceName].play();
@@ -392,24 +396,49 @@ function NoteElement(opts) {
   });
 }
 
+function NoteEventElement(opts) {
+    var options = opts || {},
+      self = this;
+  NoteElement.call(this, opts);
+  
+  this.on('hitSuccess', opts.event);
+ 
+}
+
+NoteEventElement.prototype = NoteElement.prototype;
+
 function NoteEmitElement(opts) {
     var options = opts || {},
       self = this;
   NoteElement.call(this, opts);
   
-  this.on('hitSuccess', function(force) {
-    var waven = new WaveElement({ brightness: 100, x: self.x+self.width/2, y: self.y+self.height/2, force: wave.force, speed: wave.speed });
-    waven.on('update', function(time, game) {  
-        if (this.alpha > 0) this.collidingWith(game, NoteElement, function(note) {
-          var pts = note.hit(this.alpha, this, game);
-          if (pts !== false) game.controllers.game.score += pts;
-        });
-      });
-    game.add(waven);
+  this.on('hitSuccess', function(force, wave, game, cb) {
+    game.controllers.game.emitWave({ brightness: 100, x: self.x+self.width/2, y: self.y+self.height/2, force: wave.force, speed: wave.speed }, game);
   });
+ 
 }
 
 NoteEmitElement.prototype = NoteElement.prototype;
+
+function NoteTransElement(opts) {
+    var options = opts || {},
+      self = this;
+  NoteElement.call(this, opts);
+  
+  this.id = options.id || '';
+  this.target = options.target || '';
+  
+  this.on('hitSuccess', function(force, wave, game, cb) {
+    game.get(NoteElement).filter(function(note) {
+      return note.id === self.target;
+    }).forEach(function(targets) {
+      console.log(targets);
+      game.controllers.game.emitWave({ brightness: 100, x: targets.x+targets.width/2, y: targets.y+targets.height/2, force: wave.force, speed: wave.speed }, game);
+    });
+  });
+}
+
+NoteTransElement.prototype = NoteElement.prototype;
 
 function WaveElement(opts) {
   var options = opts || {},
@@ -534,5 +563,17 @@ function GameLevel(opts) {
   this.wavesPower = options.power || 50;
   this.wavesSpeed = options.speed || 20;
   this.nextLvl = options.next || '';
+  
+  
+  if (options.descriptor) {
+    this.elements = [];
+    options.descriptor.call(this, this.elements);
+    this._descriptor = true;
+    this._descriptorF = options.descriptor;
+    
+    this._reload = function() {
+      this._descriptorF.call(self);
+    }
+  }
 }
 
